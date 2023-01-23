@@ -2,7 +2,7 @@
 
 ## Initial Setup
 
-use node version v16.15.1
+use node version v16.15.1 above
 
 # install dependencies
 
