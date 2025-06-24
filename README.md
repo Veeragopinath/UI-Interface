@@ -203,4 +203,136 @@ User registration API with password hash
 
 Role-based access (admin vs user)
 
+Sure! Here's a complete and secure User Registration API in Node.js + Express, which:
+
+Registers a user with a unique uuid
+
+Hashes the password using bcrypt
+
+Stores the user data in user.json
+
+Prevents duplicate user registration
+
+Sets timestamps for auditing
+
+
+
+---
+
+✅ Prerequisites
+
+Make sure you have installed:
+
+npm install express uuid bcrypt fs
+
+
+---
+
+🧾 user.json (initial empty array):
+
+[]
+
+
+---
+
+✅ Registration API Code (POST /register)
+
+Add this to your existing index.js:
+
+const bcrypt = require("bcrypt");
+const { v4: uuidv4 } = require("uuid");
+
+const USER_FILE = "user.json";
+
+// Utility to read/write users
+const readUsers = () => JSON.parse(fs.readFileSync(USER_FILE, "utf-8"));
+const writeUsers = (users) => fs.writeFileSync(USER_FILE, JSON.stringify(users, null, 2));
+
+// ✅ POST /register - Register a new user
+app.post("/register", async (req, res) => {
+  const { user_id, password, role, created_by } = req.body;
+
+  if (!user_id || !password || !role) {
+    return res.status(400).json({ message: "user_id, password, and role are required" });
+  }
+
+  const users = readUsers();
+
+  // Check if user_id already exists
+  if (users.find(user => user.user_id === user_id)) {
+    return res.status(409).json({ message: "User ID already exists" });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const timestamp = new Date().toISOString();
+
+  const newUser = {
+    uuid: uuidv4(),
+    user_id,
+    password: hashedPassword,
+    role,
+    is_active: true,
+    created_by: created_by || "system",
+    modified_by: created_by || "system",
+    created_at: timestamp,
+    modified_at: timestamp
+  };
+
+  users.push(newUser);
+  writeUsers(users);
+
+  res.status(201).json({ message: "User registered successfully", user_id });
+});
+
+
+---
+
+✅ Sample Request
+
+POST /register
+Content-Type: application/json
+
+{
+  "user_id": "user001",
+  "password": "Secret@123",
+  "role": "admin",
+  "created_by": "system"
+}
+
+
+---
+
+✅ Success Response
+
+{
+  "message": "User registered successfully",
+  "user_id": "user001"
+}
+
+
+---
+
+🔐 Important Notes
+
+Passwords are hashed with bcrypt before storing.
+
+Duplicate user IDs are prevented.
+
+The uuid, created_at, and modified_at are automatically handled.
+
+
+
+---
+
+Would you like me to:
+
+Add role validation from a master list?
+
+Add email/mobile support?
+
+Implement token generation right after registration (auto-login)?
+
+
+
+
 
