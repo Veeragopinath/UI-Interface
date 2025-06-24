@@ -1,99 +1,107 @@
-Great! Based on your requirements, here’s how to create GET and POST APIs using Node.js + Express with storage in a file named app_master.json (no database used).
+Great! You're aiming for a realistic token-based authentication system using JWT (JSON Web Tokens), where:
 
+After login, the backend issues a JWT token.
 
----
+The token is passed in the Authorization header like:
 
-✅ Schema:
+Authorization: Bearer <token>
 
-{
-  "id": "uuid",
-  "application_name": "string",
-  "impacted_country": ["country1", "country2"],
-  "app_id": "string",
-  "description": "string",
-  "no_of_reports": 3,
-  "reporting_nature": "string",    // (taken from a master list)
-  "is_active": true,
-  "created_by": "string",
-  "modified_by": "string",
-  "created_at": "ISO8601 timestamp",
-  "modified_at": "ISO8601 timestamp"
-}
+All protected routes (like GET /applications) decode the token to get the user_id.
+
 
 
 ---
 
-📁 File Structure
+✅ Solution Overview
 
-project/
-│
-├── app_master.json          <-- Data storage file
-├── reporting_nature.json    <-- Master values for reporting nature
-├── countries.json           <-- Master list of countries
-├── index.js                 <-- Express server
-└── package.json
+1. Login → Validates credentials and returns a JWT token.
 
 
----
+2. Protected Routes (e.g., GET /applications) → Require the token in header, extract user_id from it.
 
-📦 Install Packages
 
-npm init -y
-npm install express uuid fs
+3. No user_id in query → All secure, token-driven.
+
+
 
 
 ---
 
-🧾 Create app_master.json file with empty array
+📦 Install One Extra Package
 
-[]
-
-
----
-
-🧾 Create reporting_nature.json
-
-["Daily", "Weekly", "Monthly", "Quarterly"]
+npm install jsonwebtoken
 
 
 ---
 
-🧾 Create countries.json
+🔐 Secret Key
 
-["India", "USA", "UK", "Germany", "France"]
+Add a secret for signing the token. You can hardcode it or put in .env. For now, we’ll use:
+
+const JWT_SECRET = "your-secret-key"; // keep this safe!
 
 
 ---
 
-📄 index.js
+✅ Full Updated index.js
 
 const express = require("express");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const app = express();
 app.use(express.json());
 
+const JWT_SECRET = "your-secret-key";
+const USER_FILE = "user.json";
 const APP_FILE = "app_master.json";
 const COUNTRIES_FILE = "countries.json";
 const REPORTING_NATURE_FILE = "reporting_nature.json";
 
-// Utility: Read JSON file
+// Utility
 const readFile = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+const writeFile = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
 
-// Utility: Write to file
-const writeFile = (file, data) => {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
-};
+// ✅ Login (returns token)
+app.post("/login", async (req, res) => {
+  const { user_id, password } = req.body;
+  const users = readFile(USER_FILE);
+  const user = users.find(u => u.user_id === user_id);
+  
+  if (!user) return res.status(404).json({ message: "User not found" });
 
-// ✅ GET all applications
-app.get("/applications", (req, res) => {
-  const apps = readFile(APP_FILE);
-  res.json(apps);
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) return res.status(401).json({ message: "Invalid password" });
+
+  const token = jwt.sign({ user_id: user.user_id }, JWT_SECRET, { expiresIn: "1h" });
+  res.json({ token });
 });
 
-// ✅ POST new application
-app.post("/applications", (req, res) => {
+// ✅ Middleware to verify JWT token
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) return res.status(401).json({ message: "No token provided" });
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ message: "Invalid token" });
+    req.user_id = decoded.user_id;
+    next();
+  });
+}
+
+// ✅ GET apps created by logged-in user
+app.get("/applications", authenticateToken, (req, res) => {
+  const apps = readFile(APP_FILE);
+  const userApps = apps.filter(app => app.created_by === req.user_id);
+  res.json(userApps);
+});
+
+// ✅ POST create new app
+app.post("/applications", authenticateToken, (req, res) => {
   const {
     application_name,
     impacted_country,
@@ -101,14 +109,12 @@ app.post("/applications", (req, res) => {
     description,
     no_of_reports,
     reporting_nature,
-    is_active,
-    created_by
+    is_active
   } = req.body;
 
   const countries = readFile(COUNTRIES_FILE);
   const validNatures = readFile(REPORTING_NATURE_FILE);
 
-  // Validation
   const invalidCountries = impacted_country.filter(c => !countries.includes(c));
   if (invalidCountries.length > 0) {
     return res.status(400).json({ message: `Invalid countries: ${invalidCountries.join(", ")}` });
@@ -130,8 +136,8 @@ app.post("/applications", (req, res) => {
     no_of_reports: parseInt(no_of_reports),
     reporting_nature,
     is_active: Boolean(is_active),
-    created_by,
-    modified_by: created_by,
+    created_by: req.user_id,
+    modified_by: req.user_id,
     created_at: timestamp,
     modified_at: timestamp
   };
@@ -142,29 +148,59 @@ app.post("/applications", (req, res) => {
   res.status(201).json({ message: "Application created successfully", id: newApp.id });
 });
 
-// 🔁 Start Server
+// ✅ Start server
 app.listen(3000, () => {
-  console.log("Server running at http://localhost:3000");
+  console.log("Server running on http://localhost:3000");
 });
 
 
 ---
 
-🧪 Sample POST Request (/applications)
+🧪 Example Usage
+
+1. Login to get token
+
+POST /login
+{
+  "user_id": "user001",
+  "password": "Pass@123"
+}
+
+Response:
 
 {
-  "application_name": "Sales Dashboard",
+  "token": "eyJhbGciOi..."
+}
+
+2. Use token in request headers
+
+GET /applications
+Authorization: Bearer eyJhbGciOi...
+
+3. POST new app with token
+
+POST /applications
+Authorization: Bearer eyJhbGciOi...
+
+{
+  "application_name": "Sales Tool",
   "impacted_country": ["India", "USA"],
-  "app_id": "APP12345",
-  "description": "Tracks sales metrics",
-  "no_of_reports": 5,
+  "app_id": "APP101",
+  "description": "Tracks sales",
+  "no_of_reports": 3,
   "reporting_nature": "Monthly",
-  "is_active": true,
-  "created_by": "admin"
+  "is_active": true
 }
 
 
 ---
 
-Let me know if you want to add update/delete APIs or apply filtering/search on GET.
+Let me know if you want:
+
+Token refresh mechanism
+
+User registration API with password hash
+
+Role-based access (admin vs user)
+
 
