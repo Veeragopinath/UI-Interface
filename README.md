@@ -1,83 +1,166 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { AgGridReact } from 'ag-grid-react';
-import Select from 'react-select';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-alpine.css';
+Great idea! Separating Multer config (file upload logic) into a service file and keeping the API logic clean is a best practice. Below is a clean and modular structure for your Express app.
 
-const App = () => {
-  const gridRef = useRef();
-  
-  const [columnDefs] = useState([
-    { headerName: 'Athlete', field: 'athlete' },
-    { headerName: 'Age', field: 'age' },
-    { headerName: 'Country', field: 'country' },
-    { headerName: 'Gold', field: 'gold' },
-  ]);
 
-  const rowData = useMemo(() => [
-    { athlete: 'Michael Phelps', age: 23, country: 'USA', gold: 8 },
-    { athlete: 'Natalie Coughlin', age: 25, country: 'USA', gold: 1 },
-    { athlete: 'Aleksey Nemov', age: 24, country: 'Russia', gold: 2 },
-    { athlete: 'Alicia Coutts', age: 26, country: 'Australia', gold: 1 },
-  ], []);
+---
 
-  // Column options for search
-  const columnOptions = [
-    { label: 'Athlete', value: 'athlete' },
-    { label: 'Age', value: 'age' },
-    { label: 'Country', value: 'country' },
-    { label: 'Gold', value: 'gold' },
-  ];
+✅ Goal: Modular Express File Upload
 
-  const [selectedColumn, setSelectedColumn] = useState(null);
-  const [filterText, setFilterText] = useState('');
+Structure:
 
-  const handleFilter = () => {
-    if (selectedColumn && filterText) {
-      gridRef.current.api.setQuickFilter('');
-      gridRef.current.api.setFilterModel({
-        [selectedColumn.value]: {
-          type: 'contains',
-          filter: filterText
-        }
-      });
+project-root/
+├── uploads/                  ← Excel files saved here
+├── services/
+│   └── multerService.js      ← Multer config (file upload logic)
+├── routes/
+│   └── uploadRoute.js        ← Express route (API logic)
+├── server.js                 ← Main entry file
+├── package.json
+└── .gitignore
+
+
+---
+
+📦 Step-by-Step Setup
+
+
+---
+
+📁 services/multerService.js
+
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Create uploads folder if it doesn't exist
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+// Configure storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage });
+
+module.exports = upload;
+
+
+---
+
+📁 routes/uploadRoute.js
+
+const express = require('express');
+const router = express.Router();
+const upload = require('../services/multerService');
+const xlsx = require('xlsx');
+const path = require('path');
+
+router.post('/upload', upload.single('file'), (req, res) => {
+  try {
+    const file = req.file;
+    const createdBy = req.body.createdBy;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No Excel file uploaded' });
     }
-  };
 
-  const clearFilter = () => {
-    gridRef.current.api.setFilterModel(null);
-    setFilterText('');
-    setSelectedColumn(null);
-  };
+    // Read Excel content (optional)
+    const workbook = xlsx.readFile(file.path);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = xlsx.utils.sheet_to_json(sheet);
 
-  return (
-    <div className="ag-theme-alpine" style={{ height: 500, width: '100%' }}>
-      <div style={{ marginBottom: 10, display: 'flex', gap: 10 }}>
-        <Select
-          options={columnOptions}
-          value={selectedColumn}
-          onChange={setSelectedColumn}
-          placeholder="Select a column"
-          isSearchable
-        />
-        <input
-          type="text"
-          placeholder="Enter filter value"
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-        />
-        <button onClick={handleFilter}>Apply Filter</button>
-        <button onClick={clearFilter}>Clear</button>
-      </div>
+    res.json({
+      message: 'File uploaded successfully',
+      uploadedBy: createdBy,
+      filePath: file.filename,
+      excelData: data,
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
-      <AgGridReact
-        ref={gridRef}
-        rowData={rowData}
-        columnDefs={columnDefs}
-        animateRows={true}
-      />
-    </div>
-  );
-};
+module.exports = router;
 
-export default App;
+
+---
+
+📁 server.js
+
+const express = require('express');
+const uploadRoutes = require('./routes/uploadRoute');
+const app = express();
+const PORT = 3000;
+
+// Middleware to parse form data (text fields)
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Route
+app.use('/api', uploadRoutes);
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+
+---
+
+🧪 How to Test
+
+1. Run the server:
+
+
+
+node server.js
+
+2. Open Postman or frontend form:
+
+POST http://localhost:3000/api/upload
+
+form-data:
+
+file: Excel file
+
+createdBy: Your name or ID
+
+
+
+
+
+
+---
+
+✅ Result
+
+Excel file is stored in /uploads
+
+createdBy is read from form field
+
+Excel content is parsed and returned
+
+
+
+---
+
+Let me know if you want to:
+
+Save the file or parsed data to a database
+
+Support multiple files
+
+Add file validation (like .xlsx only)
+
+
+I'll help you extend this further.
+
