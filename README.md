@@ -1,114 +1,56 @@
-Below is a complete example of a single-file React component using MUI X DataGridPremium with a custom column filter that includes a searchable dropdown (via <Autocomplete>). Paste this into your .tsx or .jsx file and adjust imports/versions as needed:
-
-import * as React from 'react';
-import { DataGridPremium, GridColDef, GridFilterOperator, useGridApiContext } from '@mui/x-data-grid-premium';
-import { Autocomplete, InputBase, Box } from '@mui/material';
-import { getGridSingleSelectOperators } from '@mui/x-data-grid';
-
-interface Row {
-  id: number;
-  category: string;
-  value: string;
-}
-
-const rows: Row[] = [
-  { id: 1, category: 'Fruit', value: 'Apple' },
-  { id: 2, category: 'Fruit', value: 'Banana' },
-  { id: 3, category: 'Vegetable', value: 'Carrot' },
-  { id: 4, category: 'Vegetable', value: 'Broccoli' },
-];
-
-const categories = ['Fruit', 'Vegetable', 'Grain', 'Dairy'];
-
-// Custom InputComponent using Autocomplete
-function CustomAutocompleteInput(props: any) {
-  const { item, applyValue, focusElementRef, apiRef } = props;
-  const column = apiRef.current.getColumn(item.columnField!);
-  const options: string[] = (column.valueOptions as string[]) ?? [];
-
-  const handleChange = (_: any, newVal: string | null) => {
-    applyValue({ ...item, value: newVal });
-  };
-
-  return (
-    <Box sx={{ px: 1, py: 0.5 }}>
-      <Autocomplete
-        disableClearable
-        fullWidth
-        options={options}
-        value={item.value ?? ''}
-        onChange={handleChange}
-        renderInput={(params) => (
-          <InputBase
-            {...params}
-            inputRef={focusElementRef}
-            placeholder="Search…"
-            sx={{ width: '100%' }}
-          />
-        )}
-      />
-    </Box>
-  );
-}
-
-// Custom filter operator definition
-const searchableSingleSelectOperator: GridFilterOperator = {
-  label: 'is',
-  value: 'is',
-  getApplyFilterFn: (filterItem) => {
-    if (!filterItem.columnField || filterItem.value == null) return null;
-    return ({ value }) => value === filterItem.value;
-  },
-  InputComponent: CustomAutocompleteInput,
-};
-
-export default function App() {
-  const columns: GridColDef[] = [
-    {
-      field: 'category',
-      headerName: 'Category',
-      width: 180,
-      type: 'singleSelect',
-      valueOptions: categories,
-      filterOperators: [searchableSingleSelectOperator],
-    },
-    {
-      field: 'value',
-      headerName: 'Value',
-      width: 180,
-    },
-  ];
-
-  return (
-    <div style={{ height: 400, width: '100%' }}>
-      <DataGridPremium
-        rows={rows}
-        columns={columns}
-        filterMode="client"
-        disableColumnSelector
-      />
-    </div>
-  );
-}
-
-🔍 Explanation
-
-1. CustomAutocompleteInput
-Renders an <Autocomplete> inside the filter dropdown, connected to the grid via apiRef, item, and applyValue.
+To run the full code using MUI X DataGrid Premium with a custom searchable dropdown filter, you'll need to install the following packages:
 
 
-2. searchableSingleSelectOperator
-Defines a filter operator with label "is" that compares equality and uses our custom InputComponent.
+---
 
+✅ Required Installations
 
-3. Column Setup
-The category column is configured as singleSelect, uses the custom operator, and provides valueOptions.
+1. Material UI Core
 
+npm install @mui/material @emotion/react @emotion/styled
 
-4. Usage
-The grid (DataGridPremium) is set to use client-side filtering, showing our searchable dropdown in the filter menu.
+2. MUI X DataGrid Premium
+
+npm install @mui/x-data-grid-premium
+
+> ⚠️ Note: The @mui/x-data-grid-premium package requires a commercial license from MUI. If you don’t have one, you can use:
 
 
 
-This approach is based on the MUI documentation for customizing filter operators and inputs  . Let me know if you’d like to extend this to multi-select filters or server-side filtering!
+@mui/x-data-grid-pro – for most advanced features
+
+or @mui/x-data-grid – for basic features (without advanced filtering)
+
+
+If you're using Pro instead of Premium, update imports like this:
+
+import { DataGridPro } from '@mui/x-data-grid-pro';
+
+
+---
+
+Optional: Icons (for UI)
+
+npm install @mui/icons-material
+
+
+---
+
+Final List of Installations
+
+If you want to copy and paste everything at once:
+
+npm install @mui/material @emotion/react @emotion/styled @mui/x-data-grid-premium @mui/icons-material
+
+
+---
+
+📌 Node Version
+
+Ensure you're using Node.js v14 or higher, and ideally React 17 or 18.
+
+
+---
+
+Would you like a version of the code using @mui/x-data-grid-pro instead (in case you don't have a premium license)?
 
